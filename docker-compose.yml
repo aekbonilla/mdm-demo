@@ -1,0 +1,136 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  MDM Demo Stack
+#  Android:  Headwind MDM   → http://localhost:8080  (admin / hmdm)
+#  iOS:      NanoMDM        → http://localhost:9000
+#  Attack:   mitmproxy UI   → http://localhost:8082  proxy → :8081
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Shared PostgreSQL (Headwind MDM + NanoMDM) ──────────────────────────────
+  hmdm-db:
+    image: postgres:14-alpine
+    container_name: hmdm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       hmdm
+      POSTGRES_USER:     hmdm
+      POSTGRES_PASSWORD: hmdm_pass
+      # Extra DB for NanoMDM created via init script
+    volumes:
+      - hmdm_db_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    networks:
+      - mdm-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hmdm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hmdm:
+    image: headwindmdm/hmdm:latest
+    container_name: hmdm-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "31000:31000"
+    environment:
+      - SQL_HOST=hmdm-db
+      - SQL_PORT=5432
+      - SQL_BASE=hmdm
+      - SQL_USER=hmdm
+      - SQL_PASS=hmdm_pass
+      - BASE_DOMAIN=localhost
+      - SERVER_PORT=8080
+      - PROTOCOL=http
+    depends_on:
+      hmdm-db:
+        condition: service_healthy
+    volumes:
+      - hmdm_files:/opt/hmdm/files
+    networks:
+      - mdm-net
+
+  # ── iOS MDM ──────────────────────────────────────────────────────────────────
+  nanomdm:
+    image: ghcr.io/micromdm/nanomdm:latest
+    container_name: nanomdm-server
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    configs:
+      - source: nanomdm_ca
+        target: /certs/ca.crt
+        mode: 0444
+    depends_on:
+      hmdm-db:
+        condition: service_healthy
+    command:
+      - "-storage"
+      - "pgsql"
+      - "-storage-dsn"
+      - "host=hmdm-db dbname=nanomdm user=hmdm password=hmdm_pass sslmode=disable"
+      - "-api"
+      - "nanomdm"
+      - "-listen"
+      - ":9000"
+      - "-ca"
+      - "/certs/ca.crt"
+    networks:
+      - mdm-net
+
+  # ── Network Attack Simulation ────────────────────────────────────────────────
+  mitmproxy:
+    image: mitmproxy/mitmproxy:latest
+    container_name: mitmproxy
+    restart: unless-stopped
+    ports:
+      - "8081:8080"   # proxy listener
+      - "8082:8081"   # web UI
+    command: mitmweb --web-host 0.0.0.0 --listen-host 0.0.0.0 --listen-port 8080 --web-port 8081 --set web_password=admin
+    networks:
+      - mdm-net
+
+networks:
+  mdm-net:
+    driver: bridge
+
+configs:
+  nanomdm_ca:
+    content: |
+      -----BEGIN CERTIFICATE-----
+      MIIFMDCCAxigAwIBAgIJAKM+dGLn8c0FMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+      BAYTAlVTMQ0wCwYDVQQIDAREZW1vMREwDwYDVQQKDAhNRE0tRGVtbzEUMBIGA1UE
+      AwwLTURNLURlbW8tQ0EwHhcNMjYwNDA0MjIyMjI4WhcNMjcwNDA0MjIyMjI4WjBF
+      MQswCQYDVQQGEwJVUzENMAsGA1UECAwERGVtbzERMA8GA1UECgwITURNLURlbW8x
+      FDASBgNVBAMMC01ETS1EZW1vLUNBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIIC
+      CgKCAgEAvStGzqjXDTqZOEvoe80P17RvOB+/2VA/u1OSlmcYiRIfUoRNUB8E9isj
+      uJTZFFf17+LwdNbqyetBNlzSIu8WMUQdW5/VEaB4/E/KHemAkxT4lnJ5xPTkO/Xf
+      t93lvg6VdgVnRudG2Y2eSMbqN5sySiOs4vlaIRr+BVOjb4lAE2oq2ST29yfHSbMf
+      dsv+IkwPdyws/3En5sK/JwFYh5wXDsTZ7ovFrVvwV2SOmu7DC2lSZa3Ym1rC/w6G
+      0yZr7dWZUNPI2/1xyV4H34ukAqPKKC48QcTBtCyUefCi1Es0CCEeDI9G9Pm++as/
+      8ekgu171E87Yp5Zp0HZ8KZB5xFFjMfYxIh0iiH9+AQ+bzbTthxFLxMNRtGP4SU6l
+      Eb9be+ZhW2AmGhr5Vh0jiwn3+h5YtPX4QEswfXNR8NuI+5reSLPHMXGkzek0sffJ
+      ZqEpYVtoqd2SA9HFUnVHywuwSvPLhT+NSMKsmreKRr30w1Po8aMb8XKyZiSIjbkY
+      Uv4ER0xlKnIeGVLPLlZUiTcjqvMS4twL3CumWXrMxZQqyYw3S5rjnyeXfHGLspkE
+      SYFvx2ls/2+Yo2ZWzGyJCjNrSm9cz1cdTXGtyUXwHxT/UX5wnCCp6cK6E2JI0FE5
+      hJUUN/8NDRVFPbvyPR9JWBT0qMOsSvtTXFrdzlI5rABNophlsucCAwEAAaMjMCEw
+      DwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwDQYJKoZIhvcNAQELBQAD
+      ggIBAGStQ5OnppYw95zJ2TwbNEug/pRlWSRLD6HQEOyKVUROWI4pldS2hXkwwRCW
+      udUxhfLAP/vewfwYmWvbTuOhSR6WWWsNvu+oXC6pudOfSC6bYNtVZH1dp4wqdCbU
+      7BCfhu/chzA82KAgFLFmUx++ykqverrb1ApOBwbSSo7tgiX2TiLu90Lnhgdbe/d6
+      q+OfBXqKNbJC4gHW1pILG+Yq0jiOvFg0Jc+kUaV6//VBthEStwRB8czQjooC/Vwb
+      4qneiR4HebTCgIw7hRSm+8QRfsg9y27ymXrt2WMiJlsSRljPJT2MmeHJ3tR2iQjQ
+      n645Or1y/uXzvTOmxoJextQBpQ5KxgTzk7BX9Ij0GKMfgc0r6SyDM0GS2qyKKwA/
+      lHNdTPs0ed+MCmWOklSYzLCPVLwwOCH+Kvao8kz7xvvAr2oMdNAonZhDvGinpCTW
+      MR3iBVYZSHRFMEj0x22jwWiaz5A/29UEBPHjYqx9Lt4kgTTEJygXjflTbrGBbEiz
+      BeZqFaob4fpK5O29nB87iFy13tA3hv7w0FnromLKJ0fk95Tu5U4A/Cj3Vuu45IgW
+      xKko+FH0yNlegrTFhDduY54FiOhg3SymaQPj2Kaa8bTrk+IWQ3GFzIcDCaQTCBES
+      FSwEuZ7zUyx0LVOMxc5F7O5mGEpngX4Ue8XidAXGXQOsrJXt
+      -----END CERTIFICATE-----
+
+volumes:
+  hmdm_db_data:
+  hmdm_files:
+  nanomdm_certs:

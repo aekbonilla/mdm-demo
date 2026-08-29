@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadDisplayName</key>  <string>MDM Demo — Security Policy</string>
+  <key>PayloadIdentifier</key>   <string>com.mdm-demo.policy</string>
+  <key>PayloadType</key>         <string>Configuration</string>
+  <key>PayloadUUID</key>         <string>D4E5F6A7-B8C9-0123-DEFA-234567890001</string>
+  <key>PayloadVersion</key>      <integer>1</integer>
+  <key>PayloadContent</key>
+  <array>
+
+    <!-- ── 1. Passcode Policy ─────────────────────────────────────────── -->
+    <dict>
+      <key>PayloadType</key>        <string>com.apple.mobiledevice.passwordpolicy</string>
+      <key>PayloadIdentifier</key>  <string>com.mdm-demo.passcode</string>
+      <key>PayloadUUID</key>        <string>A1B2C3D4-E5F6-7890-ABCD-EF1234560001</string>
+      <key>PayloadVersion</key>     <integer>1</integer>
+      <key>PayloadDisplayName</key> <string>Passcode Policy</string>
+      <!-- Minimum 8-character alphanumeric passphrase -->
+      <key>minLength</key>          <integer>8</integer>
+      <key>requireAlphanumeric</key><true/>
+      <!-- Auto-lock after 30 seconds idle -->
+      <key>maxInactivity</key>      <integer>30</integer>
+      <!-- Wipe device after 6 consecutive failed attempts -->
+      <key>maxFailedAttempts</key>  <integer>6</integer>
+      <key>forcePIN</key>           <true/>
+    </dict>
+
+    <!-- ── 2. Always-On VPN ───────────────────────────────────────────── -->
+    <dict>
+      <key>PayloadType</key>        <string>com.apple.vpn.managed</string>
+      <key>PayloadIdentifier</key>  <string>com.mdm-demo.vpn</string>
+      <key>PayloadUUID</key>        <string>B2C3D4E5-F6A7-8901-BCDE-F12345670001</string>
+      <key>PayloadVersion</key>     <integer>1</integer>
+      <key>PayloadDisplayName</key> <string>Always-On VPN</string>
+      <key>UserDefinedName</key>    <string>Corporate VPN</string>
+      <key>VPNType</key>            <string>IKEv2</string>
+      <!-- OnDemandEnabled: connect on every network interface -->
+      <key>OnDemandEnabled</key>    <integer>1</integer>
+      <key>OnDemandRules</key>
+      <array>
+        <dict>
+          <key>Action</key><string>Connect</string>
+        </dict>
+      </array>
+    </dict>
+
+    <!-- ── 3. Device Restrictions ─────────────────────────────────────── -->
+    <dict>
+      <key>PayloadType</key>        <string>com.apple.applicationaccess</string>
+      <key>PayloadIdentifier</key>  <string>com.mdm-demo.restrictions</string>
+      <key>PayloadUUID</key>        <string>C3D4E5F6-A7B8-9012-CDEF-123456780001</string>
+      <key>PayloadVersion</key>     <integer>1</integer>
+      <key>PayloadDisplayName</key> <string>Security Restrictions</string>
+      <!-- Camera disabled — prevents visual data exfiltration -->
+      <key>allowCamera</key>                    <false/>
+      <!-- Block sideloading — only MDM-approved apps -->
+      <key>allowInstallApp</key>                <false/>
+      <!-- Block user accepting untrusted TLS certs (prevents MITM bypass) -->
+      <key>allowUntrustedTLSPrompt</key>        <false/>
+      <!-- Force encrypted iCloud/local backups -->
+      <key>forceEncryptedBackup</key>           <true/>
+      <!-- Prevent corporate data leaking to personal apps -->
+      <key>allowOpenFromManagedToUnmanaged</key><false/>
+      <key>allowOpenFromUnmanagedToManaged</key><false/>
+      <!-- Disable AirDrop data exfiltration vector -->
+      <key>allowAirDrop</key>                   <false/>
+      <!-- Disable screenshots in managed context -->
+      <key>allowScreenShot</key>                <false/>
+      <!-- Require Touch ID / Face ID -->
+      <key>allowFingerprintModification</key>   <false/>
+    </dict>
+
+    <!-- ── 4. Wi-Fi Profile ───────────────────────────────────────────── -->
+    <dict>
+      <key>PayloadType</key>        <string>com.apple.wifi.managed</string>
+      <key>PayloadIdentifier</key>  <string>com.mdm-demo.wifi</string>
+      <key>PayloadUUID</key>        <string>E5F6A7B8-C9D0-1234-EFAB-234567890001</string>
+      <key>PayloadVersion</key>     <integer>1</integer>
+      <key>PayloadDisplayName</key> <string>Corporate Wi-Fi</string>
+      <key>SSID_STR</key>           <string>MDM-Corp-Demo</string>
+      <key>EncryptionType</key>     <string>WPA2</string>
+      <key>AutoJoin</key>           <true/>
+    </dict>
+
+  </array>
+</dict>
+</plist>

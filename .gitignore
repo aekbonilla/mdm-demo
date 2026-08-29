@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+.fuse_hidden*
+
+# Office lock/temp files
+~$*
+
+# Large media — the recording lives on YouTube, not in git
+*.mp4
+*.mov
+
+# Generated TLS material — setup.sh regenerates all of this
+certs/*.key
+certs/*.crt
+certs/*.csr
+certs/*.srl
+
+# Third-party binary — pulled from the hmdm-server container, see README
+android/*.apk
+
+# Local runtime state
+.ios_sim_id
+*.db
+*.db-wal
+*.db-shm
+logs/
+*.pid
+
+# Secrets
+.env
+
+# Tooling
+.claude/
+
+# Personal workflow context, not part of the lab
+/CLAUDE.md
+/CLAUDE-mdm.md

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Device Management — Advanced Hacking Course</title>
+
+<!-- Reveal.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/night.css">
+<!-- Syntax highlighting -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
+
+<style>
+  :root {
+    --accent: #00d4aa;
+    --warn:   #ff6b6b;
+    --info:   #4ec9b0;
+  }
+  .reveal h1, .reveal h2, .reveal h3 { color: var(--accent); }
+  .reveal .subtitle { color: #aaa; font-size: 0.75em; }
+  .reveal .tag-attack  { color: var(--warn);   font-weight: bold; }
+  .reveal .tag-defence { color: var(--accent); font-weight: bold; }
+  .reveal .tag-tool    { color: var(--info);   font-weight: bold; }
+
+  /* comparison table */
+  .reveal table { font-size: 0.72em; border-collapse: collapse; width: 100%; }
+  .reveal table th { background: #1a1a2e; color: var(--accent); padding: 8px 12px; }
+  .reveal table td { padding: 6px 12px; border-bottom: 1px solid #333; }
+  .reveal table tr:nth-child(even) td { background: #161616; }
+
+  /* attack/defence boxes */
+  .box { border-radius: 6px; padding: 10px 18px; margin: 8px 0; font-size: 0.78em; text-align: left; }
+  .box-attack  { background: rgba(255,107,107,0.12); border-left: 4px solid var(--warn); }
+  .box-defence { background: rgba(0,212,170,0.10);  border-left: 4px solid var(--accent); }
+  .box-cmd     { background: #0d1117; border-left: 4px solid #58a6ff; font-family: monospace; }
+
+  /* two-column layout */
+  .cols { display: flex; gap: 20px; align-items: flex-start; }
+  .col  { flex: 1; }
+
+  /* chip badges */
+  .chip { display: inline-block; border-radius: 12px; padding: 2px 10px;
+          font-size: 0.65em; font-weight: bold; vertical-align: middle; margin: 2px; }
+  .chip-android { background: #3ddc84; color: #000; }
+  .chip-ios     { background: #007aff; color: #fff; }
+  .chip-both    { background: #8e44ad; color: #fff; }
+
+  .reveal pre { width: 100%; }
+  .reveal code { font-size: 0.82em; }
+
+  .step { counter-increment: demo-step; }
+  .step::before { content: counter(demo-step) ". "; color: var(--accent); font-weight: bold; }
+
+  .timer { position: fixed; top: 10px; right: 20px; font-size: 0.55em;
+           color: #666; font-family: monospace; z-index: 999; }
+
+  .note-icon { font-size: 0.6em; color: #888; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 1 — TITLE
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h1 style="font-size:1.6em">Mobile Device Management</h1>
+  <h3 style="color:#aaa; font-weight:300">Securing Mobile Phones Against Various Attacks</h3>
+  <hr style="border-color:#333; margin:30px auto; width:60%">
+  <p class="subtitle">ITCS-3325-003: Advanced Hacking</p>
+  <p class="subtitle">Demo Stack: Headwind MDM · xcode · mitmproxy · Android Studio · Claude</p>
+  <aside class="notes">
+    15 minutes total: ~5 min slides, ~10 min live demo.
+    Demo commands are in android/adb-demo.sh and ios/ios-sim-demo.sh.
+    Verify everything is running before starting: ./verify.sh
+  </aside>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 2 — THREAT LANDSCAPE
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Mobile Threat Landscape</h2>
+  <table>
+    <tr>
+      <th>Layer</th>
+      <th>Attack Examples</th>
+      <th>Impact</th>
+    </tr>
+    <tr>
+      <td>Physical</td>
+      <td>Shoulder surfing, theft, juice jacking (USB)</td>
+      <td>Full device access</td>
+    </tr>
+    <tr>
+      <td>Network</td>
+      <td>Rogue AP, SSL stripping, MITM, DNS spoofing</td>
+      <td>Credential theft, data interception</td>
+    </tr>
+    <tr>
+      <td>Application</td>
+      <td>Malicious apps, over-privileged apps, repackaging</td>
+      <td>Data exfiltration, spyware</td>
+    </tr>
+    <tr>
+      <td>OS / Firmware</td>
+      <td>Unpatched CVEs, rooting / jailbreaking exploits</td>
+      <td>Full system compromise</td>
+    </tr>
+    <tr>
+      <td>Social</td>
+      <td>Smishing, spear-phishing, vishing</td>
+      <td>Credential theft, malware install</td>
+    </tr>
+  </table>
+  <aside class="notes">
+    Quick overview — 60 seconds max. Each of these maps to a countermeasure
+    we will demonstrate live.
+  </aside>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 3 — WHAT IS MDM
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>What Is MDM?</h2>
+  <div class="cols">
+    <div class="col">
+      <p style="font-size:0.85em">Mobile Device Management is a <strong>policy enforcement layer</strong> between
+      an organization and the devices its users carry.</p>
+      <br>
+      <p style="font-size:0.8em"><strong>Core capabilities:</strong></p>
+      <ul style="font-size:0.78em">
+        <li>Remote lock &amp; wipe</li>
+        <li>Enforce encryption &amp; passcode</li>
+        <li>App allow/block lists</li>
+        <li>VPN &amp; Wi-Fi profile push</li>
+        <li>Certificate management</li>
+        <li>Compliance monitoring</li>
+      </ul>
+    </div>
+    <div class="col">
+      <p style="font-size:0.78em"><strong>Tools we use today:</strong></p>
+      <br>
+      <p><span class="chip chip-android">Android</span> <strong>Headwind MDM</strong><br>
+         <span style="font-size:0.65em; color:#aaa">Open-source · Docker · localhost:8080</span></p>
+      <br>
+      
+    </div>
+  </div>
+  <aside class="notes">
+    MDM protocol on iOS is Apple's proprietary APNs-based protocol.
+    Android uses its own Device Policy Manager API.
+    Both are standardised — Headwind and NanoMDM implement the open specs.
+  </aside>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 4 — ARCHITECTURE
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Simulation Architecture</h2>
+  <pre><code class="language-plaintext" style="font-size:0.72em">
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                         Your Machine (Docker)                        │
+  │                                                                      │
+  │   ┌─────────────────────┐      ┌──────────────────────────────────┐  │
+  │   │   Headwind MDM      │      │          NanoMDM                 │  │
+  │   │   (Android MDM)     │      │          (iOS MDM)               │  │
+  │   │   localhost:8080    │      │          localhost:9000          │  │
+  │   └────────┬────────────┘      └─────────────────┬────────────────┘  │
+  │            │ policy push                          │ enrollment        │
+  │            ▼                                      ▼                   │
+  │   ┌─────────────────────┐      ┌──────────────────────────────────┐  │
+  │   │  Android Emulator   │      │       iOS Simulator              │  │
+  │   │  (Android Studio    │      │       (Xcode / xcrun)            │  │
+  │   │   AVD mdm_demo)     │      │       MDM-Demo-iPhone            │  │
+  │   └─────────────────────┘      └──────────────────────────────────┘  │
+  │                                                                      │
+  │   ┌─────────────────────┐                                            │
+  │   │   mitmproxy         │  ←── network attack simulation            │
+  │   │   proxy:8081        │                                            │
+  │   │   web UI:8082       │                                            │
+  │   └─────────────────────┘                                            │
+  └──────────────────────────────────────────────────────────────────────┘
+  </code></pre>
+  <aside class="notes">
+    Everything runs locally — no external accounts needed for Android.
+    iOS full push requires APNs (Apple Developer account). We demo the
+    profile installation and xcrun simctl privacy commands instead.
+  </aside>
+</section>
+
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 11 — DEMO 5: Compliance Dashboard
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Demo 5 — Compliance Dashboard </h2>
+
+  <div class="box box-attack">
+    <span class="tag-attack">PROBLEM WITHOUT MDM:</span> IT has no visibility.
+    Devices may be unencrypted, running outdated OS, or have malicious apps — and nobody knows.
+  </div>
+
+  <div class="box box-defence">
+    <span class="tag-defence">MDM VISIBILITY:</span>
+  </div>
+
+  <div class="cols" style="font-size:0.75em; margin-top:10px">
+    <div class="col">
+      <p><strong>Headwind MDM → Devices tab shows:</strong></p>
+      <ul>
+        <li>Online / offline status</li>
+        <li>Last sync time</li>
+        <li>Policy compliance (green/red)</li>
+        <li>OS version + security patch</li>
+        <li>Installed app list</li>
+        <li>Storage encryption state</li>
+      </ul>
+    </div>
+    <div class="col">
+      <p><strong>What a compliance violation looks like:</strong></p>
+      <ul>
+        <li style="color: var(--warn)">⚠ PIN strength below policy</li>
+        <li style="color: var(--warn)">⚠ Unapproved app installed</li>
+        <li style="color: var(--warn)">⚠ OS not updated</li>
+        <li style="color: var(--warn)">⚠ Device not seen in 7 days</li>
+        <li style="color: var(--accent)">✓ Encryption enabled</li>
+        <li style="color: var(--accent)">✓ All policies applied</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Live: open localhost:8080, go to Devices. Point out the compliance column.
+    Show the device detail page — expand it to see all the enrolled device info.
+    This is what separates MDM from "asking users to configure their phones."
+  </aside>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 13 — DEFENCE-IN-DEPTH SUMMARY
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Defence-in-Depth Summary</h2>
+  <table>
+    <tr>
+      <th>Attack Vector</th>
+      <th>MDM Control</th>
+      <th>Demo Tool</th>
+    </tr>
+    <tr>
+      <td>Weak PIN / no lock</td>
+      <td>Enforce 8-char alphanumeric, auto-lock 30 s</td>
+      <td>Headwind policy</td>
+    </tr>
+    <tr>
+      <td>Rogue AP / MITM</td>
+      <td>Always-on VPN profile enforced by MDM</td>
+      <td>mitmproxy → vpn</td>
+    </tr>
+    <tr>
+      <td>Stolen device</td>
+      <td>Remote lock + FDE + remote wipe</td>
+      <td>HMDM admin panel</td>
+    </tr>
+    <tr>
+      <td>Malicious / over-privileged app</td>
+      <td>App blocklist + permission restrictions</td>
+      <td>xcrun simctl privacy</td>
+    </tr>
+    <tr>
+      <td>Data leakage (managed→personal)</td>
+      <td>allowOpenFromManagedToUnmanaged: false</td>
+      <td>mobileconfig</td>
+    </tr>
+    <tr>
+      <td>No IT visibility</td>
+      <td>Compliance dashboard + policy audit trail</td>
+      <td>HMDM Devices tab</td>
+    </tr>
+    <tr>
+      <td>Outdated OS</td>
+      <td>OS version check + mandatory update policy</td>
+      <td>HMDM configuration</td>
+    </tr>
+  </table>
+  <aside class="notes">
+    This is the closing summary. Each row maps an attack to a specific MDM control
+    and the tool we used to demonstrate it. Emphasize: MDM does NOT prevent all attacks,
+    but it massively raises the cost of attack and reduces the blast radius.
+  </aside>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 14 — KEY TAKEAWAYS
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Key Takeaways</h2>
+  <div style="text-align:left; font-size:0.82em">
+    <p>🔐 <strong>MDM shifts security from user responsibility to policy enforcement.</strong><br>
+       <span style="color:#888; font-size:0.85em">Users don't need to "remember" to turn on encryption — MDM won't let them turn it off.</span></p>
+    <br>
+    <p>🌐 <strong>Always-on VPN is the primary defence against network-layer attacks.</strong><br>
+       <span style="color:#888; font-size:0.85em">A rogue AP is useless if every connection is tunnelled before it hits the AP.</span></p>
+    <br>
+    
+    <p>👁️ <strong>Visibility is a security control.</strong><br>
+       <span style="color:#888; font-size:0.85em">You cannot protect what you cannot see. Compliance dashboards are threat detection tools.</span></p>
+    <br>
+    <p>🔓 <strong>MDM is defeated by physical access + no FDE, social engineering, and zero-days.</strong><br>
+       <span style="color:#888; font-size:0.85em">It is one layer. Combine with EDR, UEBA, and user training.</span></p>
+  </div>
+  <aside class="notes">
+    Wrap up in under 30 seconds. Leave time for questions.
+    If asked about zero-days: MDM can enforce update policies to shrink the patch window,
+    but a fresh zero-day beats MDM until a patch is deployed.
+  </aside>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SLIDE 15 — DEMO CHEAT SHEET (hidden / speaker only)
+══════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2 style="font-size:1em">Quick Reference — Demo Commands</h2>
+  <div class="cols" style="font-size:0.65em">
+    <div class="col">
+      <p><strong>Pre-flight:</strong></p>
+      <div class="box box-cmd">
+        cd mdm-demo<br>
+        ./verify.sh<br>
+        open http://localhost:8080<br>
+        open http://localhost:8082
+      </div>
+      <p><strong>Android:</strong></p>
+      <div class="box box-cmd">
+        ./android/avd-setup.sh start<br>
+        ./android/adb-demo.sh info<br>
+        ./android/adb-demo.sh mitm<br>
+        ./android/adb-demo.sh vpn<br>
+        ./android/adb-demo.sh lock<br>
+        ./android/adb-demo.sh audit
+      </div>
+    </div>
+    <div class="col">
+      <p><strong>iOS:</strong></p>
+      <div class="box box-cmd">
+        ./ios/ios-sim-demo.sh start<br>
+        ./ios/ios-sim-demo.sh install<br>
+        ./ios/ios-sim-demo.sh show-profile<br>
+        ./ios/ios-sim-demo.sh grant-revoke<br>
+        ./ios/ios-sim-demo.sh privacy<br>
+        ./ios/ios-sim-demo.sh nanomdm
+      </div>
+      <p><strong>Reset everything:</strong></p>
+      <div class="box box-cmd">
+        docker-compose down -v<br>
+        ./setup.sh
+      </div>
+    </div>
+  </div>
+  <aside class="notes">This is your cheat sheet. Keep this slide open in speaker view during the demo.</aside>
+</section>
+
+</div><!-- .slides -->
+</div><!-- .reveal -->
+
+<!-- Reveal.js scripts -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/zoom/zoom.js"></script>
+
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  transition: 'slide',
+  transitionSpeed: 'fast',
+  controls: true,
+  progress: true,
+  center: true,
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  plugins: [ RevealNotes, RevealHighlight, RevealZoom ],
+  highlight: {
+    highlightOnLoad: true
+  }
+});
+</script>
+</body>
+</html>
